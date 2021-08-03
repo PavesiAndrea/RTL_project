@@ -20,10 +20,11 @@ end entity;
 
 architecture Behavior of project_reti_logiche is
 
-type state_type is (START, IN_READ, IN_READ_WAIT, GET_COL,  GET_ROW,
-CHECK_DIM_IN,CHECK_MIN_MAX, CALC_SHIFT,CHECK_DIM_OUT, NEW_VALUE, WRITE, DONE, START_WAIT);
+type state_type is (START, IN_READ, IN_READ_WAIT, GET_COL,  GET_COL_WAIT, GET_ROW, GET_ROW_WAIT,
+CHECK_DIM_IN,CHECK_MIN_MAX,CALC_SHIFT,CHECK_DIM_OUT, NEW_VALUE, WRITE, DONE, START_WAIT);
 
-signal state: state_type := START;
+signal state_next : state_type;
+signal state_curr : state_type;
 
 signal MAX_PIXEL_VALUE: unsigned(7 downto 0) := (others => '0'); --setto a 0 il valore max in modo che nel primo ciclo venga subito sostituito
 signal MIN_PIXEL_VALUE: unsigned(7 downto 0) := (others => '1'); --setto a 255 il valore min in modo che nel primo ciclo venga subito sostituito
@@ -42,6 +43,7 @@ function shift_level_funct ( number : unsigned(7 downto 0)) return integer is
     end if;
 end function;
 
+signal reading_done : boolean := false;
 signal temp_pixel : std_logic_vector(7 downto 0);
 signal new_pixel_value : std_logic_vector(7 downto 0);
 signal addr: std_logic_vector(15 downto 0);
@@ -50,7 +52,7 @@ signal temp_value_vect: std_logic_vector(7 downto 0);
 
 begin
 
-    transistions : process(i_clk) 
+    process(i_clk) 
     
     variable counter : integer;
     variable wr_counter: integer;
@@ -64,94 +66,99 @@ begin
     
     begin
     
-    if rising_edge(i_clk) then  o_en <= '0';
-                                o_done <= '0';
-                                o_we <= '0';
-                                o_data <= (others => '0');
-                                o_address <= (others => '0');
+    if(i_clk'event and i_clk = '1')then
+        if(i_rst = '1')then
+            state_curr <= START;
+        else
+            state_curr <= state_next;
+        end if;
     
-    if i_rst = '1' then state <= START; 
     
-    else case state is
+    else case state_curr is
     
         when START => 
-                        o_en <= '1';
-                        o_we <= '0';
                         counter := 2; 
                         column := 0;
                         row := 0;
-                        if i_start = '1' then state <= GET_COL;
-                        else state <= START;
+                        reading_done <= false;
+                        if i_start = '1' then state_next <= GET_COL_WAIT;
+                        else state_next <= START;
                         end if;
         
-        when GET_COL =>    
-                        o_address <= "0000000000000000";
-                        state <= GET_COL;
-                        column := to_integer(unsigned(i_data));
-                        o_address <= "0000000000000001";   
-                        report "colonna:" & integer'image(column);
-                        state <= GET_ROW;
+        when GET_COL_WAIT => o_en <= '1';
+                             o_we <= '0';
+                             o_address <= "0000000000000000";
+                             --state_next <= GET_COL;
+                             --report "colonna:" & integer'image(column);
+                             state_next <= GET_COL;
        
+        when GET_COL =>  column := to_integer(unsigned(i_data));
+                         state_next <= GET_ROW_WAIT;
+           
+        when GET_ROW_WAIT => o_en <= '1';
+                             o_we <= '0';
+                             o_address <= "0000000000000001";   
+                             state_next <= GET_ROW;
+                    
         when GET_ROW =>  
                         row := to_integer(unsigned(i_data));
-                        report "riga:" & integer'image(row);
+                        --report "riga:" & integer'image(row);
                         int_res := row*column; --numero di pixel presenti da modificare 
-                        report "int res" & integer'image(int_res);
-                        if(int_res = 0) then state <= DONE;
-                        else state <= IN_READ_WAIT;
+                        --report "int res" & integer'image(int_res);
+                        if(int_res = 0) then state_next <= DONE;
+                        else state_next <= IN_READ_WAIT;
                         end if;
                             
         when CHECK_DIM_IN => 
-                             if(counter < int_res+2) then state <= IN_READ_WAIT;
-                             else state <= CALC_SHIFT;
+                             if(counter < int_res+2) then state_next <= IN_READ_WAIT;
+                             else reading_done <= true;
+                                  state_next <= CALC_SHIFT;
                              end if;
                             
-        when IN_READ_WAIT =>    
-                                addr := std_logic_vector(to_unsigned(counter,16));
-                                o_address <= addr;
-                                state <= IN_READ;                        
+        when IN_READ_WAIT => o_en <= '1';
+                             o_we <= '0'; 
+                             o_address <= std_logic_vector(to_unsigned(counter,16)); 
+                             state_next <= IN_READ;                        
                         
         when IN_READ => 
                         data_read := unsigned(i_data);
-                        report "counter:" &integer'image(counter); 
-                        report "indirizzo letto:" &integer'image(to_integer(unsigned(addr)));
-                        report "letto:" &integer'image(TO_INTEGER(unsigned(data_read)));   
+                        --report "counter:" &integer'image(counter); 
+                        --report "indirizzo letto:" &integer'image(to_integer(unsigned(addr)));
+                        --report "letto:" &integer'image(TO_INTEGER(unsigned(data_read)));   
                         counter := counter +1;
-                        state <= CHECK_DIM_IN;
+                        if (reading_done) then state_next <= NEW_VALUE;
+                        else state_next <= CHECK_MIN_MAX;
+                        end if;
                         
-        when CHECK_MIN_MAX =>                
-                                if(MIN_PIXEL_VALUE > data_read) then MIN_PIXEL_VALUE <= data_read;
-                                elsif (MAX_PIXEL_VALUE < data_read) then MAX_PIXEL_VALUE <= data_read;
-                                end if;
-                                counter := counter + 1;
-                                report "letto:" &integer'image(TO_INTEGER(unsigned(data_read)));
-                                report "min:" &integer'image(TO_INTEGER(unsigned(MIN_PIXEL_VALUE)));
-                                report "max:" &integer'image(TO_INTEGER(unsigned(MAX_PIXEL_VALUE)));
-                                state <= CHECK_DIM_IN;
-                        
+        when CHECK_MIN_MAX =>               
+                          if(MIN_PIXEL_VALUE > data_read) then MIN_PIXEL_VALUE <= data_read;
+                          --report "min:" &integer'image(TO_INTEGER(unsigned(MIN_PIXEL_VALUE)));
+                           end if;                              
+                          if (MAX_PIXEL_VALUE < data_read) then MAX_PIXEL_VALUE <= data_read;  
+                          --report "max:" &integer'image(TO_INTEGER(unsigned(MAX_PIXEL_VALUE)));
+                          end if;
+                          state_next <= CHECK_DIM_IN;       
+                         --else state_next <= CHECK_MAX;
                           
                             
         when CALC_SHIFT => 
                             shift_level := shift_level_funct(MAX_PIXEL_VALUE - MIN_PIXEL_VALUE + 1);
-                            wr_counter := counter; --primo indirizzo di scrittura puntato dal contatore
+                            wr_counter := int_res; --primo indirizzo di scrittura puntato dal contatore
                             counter := 2; --riparte dall'inizio per ciclare nuovamente su tutti i valori
-                            state <= CHECK_DIM_OUT;   
+                            state_next <= CHECK_DIM_OUT;   
                             
         when CHECK_DIM_OUT => 
-                                if(counter < int_res) then state <= NEW_VALUE;
-                                else state <= DONE;
+                                if(counter < int_res) then state_next <= IN_READ_WAIT;
+                                else state_next <= DONE;
                                 end if;
         
         when NEW_VALUE =>
-                            o_en <= '1';
-                            o_we <= '1';
-                            o_address <= std_logic_vector(to_unsigned(counter,16));
-                            temp_value_vect <= std_logic_vector(unsigned(i_data) - MIN_PIXEL_VALUE);
+                            temp_value_vect <= std_logic_vector(unsigned(data_read) - MIN_PIXEL_VALUE);
                             temp_pixel <= std_logic_vector(shift_left(unsigned(temp_value_vect), shift_level));
                             if(temp_pixel < "11111111") then new_pixel_value <= temp_pixel;
                             else new_pixel_value <= "11111111";
                             end if;
-                            state <= WRITE;
+                            state_next <= WRITE;
                               
         when WRITE => 
                         o_en <= '1';
@@ -160,22 +167,19 @@ begin
                         o_data <= new_pixel_value;
                         counter := counter +1;
                         wr_counter := wr_counter + 1;
-                        state <= CHECK_DIM_OUT;
+                        state_next <= CHECK_DIM_OUT;
                                              
         
         when DONE => 
-                        o_en <= '0';
-                        o_we <= '0';
                         o_done <= '1';
-                        state <= START_WAIT;
+                        state_next <= START_WAIT;
         
         when START_WAIT => 
-                            if(i_start = '0')then state <= START;
-                            else state <= START_WAIT;
+                            if(i_start = '0')then state_next <= START;
+                            else state_next <= START_WAIT;
                             end if;
                             
         end case;
-    end if;
     end if;
 end process;
 end architecture;
