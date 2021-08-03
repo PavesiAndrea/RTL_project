@@ -1,5 +1,6 @@
- library IEEE;
+library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 -- Uncomment the following library declaration if using
@@ -12,148 +13,142 @@ use IEEE.NUMERIC_STD.ALL;
 --use UNISIM.VComponents.all;
 
 entity project_reti_logiche is
-Port ( i_clk : in STD_LOGIC;
-i_rst : in STD_LOGIC;
-i_start : in STD_LOGIC;
-i_data : in STD_LOGIC_VECTOR (7 downto 0);
-o_address : out STD_LOGIC_VECTOR (15 downto 0);
-o_done : out STD_LOGIC;
-o_en : out STD_LOGIC;
-o_we : out STD_LOGIC;
-o_data : out STD_LOGIC_VECTOR (7 downto 0));
+Port (  i_clk : in STD_LOGIC;
+        i_rst : in STD_LOGIC;
+        i_start : in STD_LOGIC;
+        i_data : in STD_LOGIC_VECTOR (7 downto 0);
+        o_address : out STD_LOGIC_VECTOR (15 downto 0);
+        o_done : out STD_LOGIC;
+        o_en : out STD_LOGIC;
+        o_we : out STD_LOGIC;
+        o_data : out STD_LOGIC_VECTOR (7 downto 0));
 end project_reti_logiche;
 
 architecture Behavioral of project_reti_logiche is
 
-type state is (START, IN_READ, GET_DIM,
-CHECK_DIM_IN, CHECK_MIN, CHECK_MAX, CALC_DV, CALC_SHIFT,CHECK_DIM_OUT, NEW_VALUE, FINE, LOW_START_WAIT);
-signal state_next: state;
-signal state_curr: state;
+    type state_type is (START,GET_COLUMN_WAIT,GET_COLUMN,GET_ROW_WAIT,GET_ROW,IN_READ_WAIT,IN_READ,CHECK_DIM_IN,CALC_DV_SHIFT,
+                          CHECK_DIM_OUT,NEW_VALUE, WRITE, FINE, START_WAIT);
+    signal state_next : state;
+    signal state_curr : state;
+    signal read_all : boolean := false
+    signal MAX_PIXEL_VALUE: std_logic_vector(7 downto 0);
+    signal MIN_PIXEL_VALUE: std_logic_vector(7 downto 0);
+    signal counter: integer;
+    signal data : std_logic_vector(7 downto 0);
+    signal delta_value : std_logic_vector(7 downto 0);
+    signal shift_level : integer;
+    signal temp_pixel : std_logic_vector(7 downto 0);
+    signal new_pixel_value : std_logic_vector(7 downto 0);
+    signal int_res: integer;
+    signal row: std_logic_vector(7 downto 0);
+    signal clmn: std_logic_vector(7 downto 0);
+    signal next_addr: std_logic_vector(15 downto 0);
+    signal temp_value: integer;
+    signal temp_value_vect: std_logic_vector(7 downto 0);
 
 begin
 
- process(i_clk, i_rst)
-variable counter: integer;
-variable wr_counter : integer;
-variable data : integer;
-variable delta_value : integer;
-variable shift_value : integer;
-variable temp_pixel : std_logic_vector(7 downto 0);
-variable new_pixel_value : std_logic_vector(7 downto 0);
-variable int_res: integer;
-variable row: std_logic_vector(7 downto 0);
-variable column: std_logic_vector(7 downto 0);
-variable next_addr: std_logic_vector(15 downto 0);
-variable min: integer;
-variable max: integer;
-variable temp_value: std_logic_vector(7 downto 0);
+    process(i_clk)
 
-begin
---if(i_clk'event and i_clk = '1') then
--- if(i_rst = '1') then state_curr<=START_WAIT;
---else state_curr<=state_next;
---end if;
-    if(i_rst = '1') then
-        o_en <= '0';
-        o_we <= '0';
-        o_done <= '0';
-        counter := 0;
-        wr_counter := 1;
-        data := 0;
-        state_curr <= START;
-    elsif(rising_edge(i_clk)) then
-    case state_curr is
-        when START => if(i_start = '1' AND i_rst = '0') then
-                            o_en <= '1';
-                            o_we <= '0';
-                            temp_pixel := "00000000";
-                            delta_value := 0;
-                            shift_value := 0;
-                            new_pixel_value := "00000000";
-                            row := "00000000";
-                            column := "00000000";
-                            state_next <= GET_DIM;
-                        else state_next <= START;
-                        end if;
-        
-        when GET_DIM => o_address <= "0000000000000000";
-                        column := i_data;
-                        o_address <= "0000000000000001";
-                        row := i_data;
-                        int_res := (to_integer(unsigned(row)))*(to_integer(unsigned(column)));
-                        state_next <= CHECK_DIM_IN;
-        
-        when CHECK_DIM_IN => if(counter < int_res) then state_next<= IN_READ;
-                            else state_next <= CALC_DV;
-                            end if;
-                            
-        when IN_READ => o_en <= '1';
-                        o_we <= '0';
-                        counter := counter + 1;
-                        next_addr := std_logic_vector(TO_UNSIGNED((counter +1),16));
-                        o_address <= next_addr;
-                        data := TO_INTEGER(unsigned(i_data));
-                        if(counter = 1) then min := data;
-                                             max := min;
-                                             state_next <= CHECK_DIM_IN;
-                        else state_next <= CHECK_MIN;
-                        end if;
-                            
-        when CHECK_MIN => if(data < min) then min := data;
-                                         state_next <= CHECK_DIM_IN;
-                            else state_next <= CHECK_MAX;
-                            end if;
-                            
-        when CHECK_MAX => if(data > max) then max := data;
-                            end if;
+    begin
+     transitions: process (i_clk)
+     begin
+         if(i_clk'event and i_clk = '1')then
+             if(i_rst = '1')then
+                state_curr <= START;
+             else
+                state_curr <= state_next;
+        end if;
+          else case state is               
+      
+            when START => read_all <= false;
+            repo
+                          counter <= 0; 
+                          MAX_PIXEL_VALUE <= (others => '0');
+                          MIN_PIXEL_VALUE <= (others => '1'); 
+                          o_done <= '0';                   
+                          if (i_start = '1') then _next <= GET_COLUMN_WAIT;
+                          else state_next <= START;
+                          end if;
+                          
+            when GET_COLUMN_WAIT => o_en <= '1';
+                                    o_we <= '0';
+                                    o_address <= std_logic_vector(to_unsigned(counter,16));
+                                    state_next <=  GET_COLUMN;
+                                
+            when GET_COLUMN => clmn <= i_data;
+                               counter <= counter +1;
+                               state_next <= GET_ROW_WAIT;
+                               
+            when GET_ROW_WAIT => o_en <= '1';
+                                 o_we <= '0';
+                                 o_address <= std_logic_vector(to_unsigned(counter,16));
+                                 state_next <= GET_ROW;
+                                
+            when GET_ROW => row <= unsigned(i_data;
+                            int_res <= (to_integer(unsigned(row))*(to_integer(unsigned(clmn));
+                            counter <= counter + 1;
                             state_next <= CHECK_DIM_IN;
+            
+            
+            when CHECK_DIM_IN => if(counter <= (int_res+2)) then state_next <= IN_READ_WAIT;
+                                 else state_next <= CALC_DV_SHIFT;
+                                 end if;
+                                
+            when IN_READ_WAIT => o_en <= '1';
+                                 o_we <= '0';
+                                 o_address <= std_logic_vector(TO_UNSIGNED(counter,16));
+                                 state_next <= IN_READ;
                             
-        when CALC_DV => delta_value := (max - min);
-                        state_next <= CALC_SHIFT;
-                        
-        when CALC_SHIFT => delta_value := delta_value + 1;
-                           shift_value := 8;
-                           while delta_value > 1 loop
-                                delta_value := delta_value/2;
-                                shift_value := shift_value - 1;
-                           end loop;
-                           state_next <= CHECK_DIM_OUT;
-                            
-        when CHECK_DIM_OUT => if(wr_counter < int_res) then state_next <= NEW_VALUE;
-                              else state_next <= FINE;
+            when IN_READ => data <= i_data;    
+                            if(to_integer(unsigned(MIN_PIXEL_VALUE)) > to_integer(unsigned(data))) then MIN_PIXEL_VALUE <= data;
+                            elsif (to_integer(unsigned(MAX_PIXEL_VALUE)) < to_integer(unsigned(data))) then MAX_PIXEL_VALUE <= data;
+                            end if;
+                            if (read_all) then state_next <= NEW_VALUE;     
+                            else state_next <= CHECK_DIM_IN;     
+                                
+            when CALC_DV_SHIFT =>  read_all <= true;
+                                   delta_value <= std_logic_vector(MAX_PIXEL_VALUE - MIN_PIXEL_VALUE);
+                                   temp_value <= to_integer(unsigned(delta_value));
+                                   shift_level <= 8;
+                                   while temp_value>1 loop
+                                        temp_value <= temp_value/2;
+                                        shift_level <= shift_level - 1;
+                                   end loop; 
+                                   counter <= 0;
+                                   state_next <= CHECK_DIM_OUT;   
+                                
+            when CHECK_DIM_OUT => if(counter < int_res) then state_next <= IN_READ_WAIT;
+                                  else state_next <= FINE;
+                                  end if;
+            
+            when NEW_VALUE => temp_value_vect <= std_logic_vector(unsigned(data) - MIN_PIXEL_VALUE);
+                              temp_pixel <= sll std_logic_vector(shift_level(unsigned(temp_value_vect));
+                              if(temp_pixel < "11111111") then new_pixel_value <= temp_pixel;
+                              else new_pixel_value <= "11111111";
                               end if;
-        
-        when NEW_VALUE =>  o_en <= '1';
-                           o_we <= '1';
-                           wr_counter := wr_counter + 1;
-                           next_addr := std_logic_vector(TO_UNSIGNED((wr_counter),16));
-                           o_address <= next_addr;
-                           temp_value := i_data;
-                           temp_value := std_logic_vector(to_unsigned((to_integer(unsigned(temp_value))) - min,8));
-                           temp_pixel := std_logic_vector(shift_left(unsigned(temp_value), shift_value));
-                           next_addr := std_logic_vector(TO_UNSIGNED((wr_counter + int_res),16));
-                           if((to_integer(unsigned(temp_pixel))) < 255) then new_pixel_value := temp_pixel;
-                           else new_pixel_value := "11111111";
-                           end if;
-                           o_address <= next_addr;
-                           o_data <= new_pixel_value;
-                           state_next <= CHECK_DIM_OUT;
-        
-        when FINE =>  o_en <= '0';
-                      o_we <= '0';
-                      o_done <= '1';
-                      state_next <= LOW_START_WAIT;
-        
-        when LOW_START_WAIT => if(i_start = '0')then o_done <= '0';
-                                                     state_next<= START;
-                                else state_next <= LOW_START_WAIT;
-                                end if;
-
+                              state_next <= WRITE;
+                                  
+            when WRITE => o_en <= '1';
+                          o_we <= '1';
+                          o_address <= std_logic_vector(to_unsigned(counter + int_res + 2,16));
+                          o_data <= new_pixel_value;
+                          counter <= counter + 1;
+                          state_next <= CHECK_DIM_OUT;
+                                                 
+            
+            when FINE => o_en <= '0';
+                         o_we <= '0';
+                         o_done <= '1';
+                         state_next <= START_WAIT;
+            
+            when START_WAIT => if i_start = '0' then state_next <= START;
+                               else state_next <= START_WAIT;
+                               end if;
+                                    
         end case;
-    end if;
+    end if
 
 end process;
-
-end architecture;
-            
+end Behavioral;
                 
