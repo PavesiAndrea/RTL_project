@@ -141,23 +141,30 @@ begin
                          --else state_next <= CHECK_MAX;
                           
                             
-        when CALC_SHIFT => 
-                            shift_level := shift_level_funct(MAX_PIXEL_VALUE - MIN_PIXEL_VALUE + 1);
+        when CALC_SHIFT =>  report "max:" &integer'image(TO_INTEGER(unsigned(MAX_PIXEL_VALUE)));
+                            report "min:" &integer'image(TO_INTEGER(unsigned(MIN_PIXEL_VALUE)));
+                            shift_level := 8 - shift_level_funct(MAX_PIXEL_VALUE - MIN_PIXEL_VALUE + 1);
+                            report "shift:" &integer'image(shift_level);  
                             wr_counter := int_res; --primo indirizzo di scrittura puntato dal contatore
                             counter := 2; --riparte dall'inizio per ciclare nuovamente su tutti i valori
                             state_next <= CHECK_DIM_OUT;   
                             
         when CHECK_DIM_OUT => 
-                                if(counter < int_res) then state_next <= IN_READ_WAIT;
+                                if(counter < int_res+2) then state_next <= IN_READ_WAIT;
                                 else state_next <= DONE;
                                 end if;
+                                --fino a qui non dovrebbero esserci problemi, shift e' 6 ed e' giusto
         
-        when NEW_VALUE =>
+        when NEW_VALUE =>   --qui cominciano i cazzi con temp value e temp pixexl
+                            report "letto:" &integer'image(TO_INTEGER(unsigned(data_read)));  
                             temp_value_vect <= std_logic_vector(unsigned(data_read) - MIN_PIXEL_VALUE);
+                            report "temp value:" &integer'image(TO_INTEGER(unsigned(temp_value_vect)));
                             temp_pixel <= std_logic_vector(shift_left(unsigned(temp_value_vect), shift_level));
-                            if(temp_pixel < "11111111") then new_pixel_value <= temp_pixel;
+                            report "temp pixel:" &integer'image(TO_INTEGER(unsigned(temp_pixel)));
+                            if((TO_INTEGER(unsigned(temp_pixel))) < 255) then new_pixel_value <= temp_pixel;
                             else new_pixel_value <= "11111111";
                             end if;
+                            report "nuovo pixel:" &integer'image(TO_INTEGER(unsigned(new_pixel_value)));
                             state_next <= WRITE;
                               
         when WRITE => 
@@ -165,8 +172,8 @@ begin
                         o_we <= '1';
                         o_address <= std_logic_vector(to_unsigned(wr_counter,16));
                         o_data <= new_pixel_value;
-                        counter := counter +1;
                         wr_counter := wr_counter + 1;
+                        --counter+1 tolto perche' lo fa dopo che legge il valore di input
                         state_next <= CHECK_DIM_OUT;
                                              
         
