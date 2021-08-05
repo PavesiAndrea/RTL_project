@@ -72,10 +72,10 @@ begin
     
     --variabili
     variable int_res: integer; --contiene il numero di pixel da leggere (colonna * riga)
-    variable counter : integer;  --contatore usato per sapere quabnti valori sono gi‡ stati letti da memoria 
+    variable counter : integer;  --contatore usato per sapere quabnti valori sono gi√† stati letti da memoria 
     variable int1: integer; --variabile locale generica per salvare valori numerici
     variable var: unsigned(7 downto 0) := (others => '0'); --usato per la conversione al momento dello shift
-    variable new_pixel_value : std_logic_vector(15 downto 0):= (others => '0'); --valore vettoriale del pixel che sar‡ scritto in memoria
+    variable new_pixel_value : std_logic_vector(15 downto 0):= (others => '0'); --valore vettoriale del pixel che sar√† scritto in memoria
    
     begin
         if(i_rst = '1')then --nel caso arrivi un segnale di reset, riporta allo stato iniziale con conseguente reset delle variabili
