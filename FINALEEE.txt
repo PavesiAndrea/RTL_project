@@ -1,6 +1,6 @@
 -- Politecnico di Milano
 -- Pavesi Andrea, Radaelli Marta
--- Matricole 909232, 
+-- Matricole 909232,907615 
 -- Codice Persona 10659804, 
 -- Prova finale di reti logiche 2020-2021
 ---------------------------------------------------------------------------------------
