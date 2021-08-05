@@ -21,7 +21,7 @@ end entity;
 architecture Behavior of project_reti_logiche is
 
 type state_type is (START, IN_READ, GET_ROW_WAIT,
-CHECK_DIM_IN,CHECK_MIN_MAX, CHECK_DIM_OUT, NEW_VALUE, CHECK_VALUE, WRITE, DONE);
+CHECK_DIM_IN,CHECK_MIN_MAX, CHECK_DIM_OUT, NEW_VALUE, WRITE, DONE);
 
 --signal state_next : state_type;
 signal state_curr : state_type;
@@ -44,7 +44,7 @@ function shift_level_funct ( number : unsigned(7 downto 0)) return integer is
 end function;
 
 signal reading_done : boolean := false;
-signal new_pixel_value : std_logic_vector(15 downto 0);
+
 
 
 begin
@@ -55,6 +55,7 @@ begin
     variable int_res: integer;
     variable int1: integer;
     variable var: unsigned(7 downto 0) := (others => '0');
+    variable new_pixel_value : std_logic_vector(15 downto 0):= (others => '0');
    
     begin
         if(i_rst = '1')then
@@ -114,27 +115,28 @@ begin
                                     end if;
             
             when NEW_VALUE =>   
-                                int1 := shift_level_funct(MAX_PIXEL_VALUE - MIN_PIXEL_VALUE + 1);
-                                var := unsigned(i_data) - MIN_PIXEL_VALUE;
-                                new_pixel_value <= std_logic_vector(shift_left(resize(var,16),int1));
-                                state_curr <= CHECK_VALUE;
-                                
-            when CHECK_VALUE => 
-                                if(to_integer(unsigned(new_pixel_value)) > 255) then new_pixel_value <= std_logic_vector(to_unsigned(255,16));
-                                end if;
-                                o_address <= std_logic_vector(to_unsigned(counter+int_res-1,16));
-                                o_we <= '1';
-                                state_curr <= WRITE;
-                                  
-            when WRITE =>   
-                            o_data <= std_logic_vector(resize(unsigned(new_pixel_value), 8));
-                           state_curr <= CHECK_DIM_OUT;
-                                                 
-            
-            when DONE =>    
-                            if i_start = '0' then state_curr <= START;
-                            else state_curr <= DONE;
+                            int1 := shift_level_funct(MAX_PIXEL_VALUE - MIN_PIXEL_VALUE + 1);
+                            var := unsigned(i_data) - MIN_PIXEL_VALUE;
+                            new_pixel_value := std_logic_vector(shift_left(resize(var,16),int1));
+                        
+                            if(to_integer(unsigned(new_pixel_value)) > 255) then new_pixel_value := std_logic_vector(to_unsigned(255,16));
                             end if;
+                            o_address <= std_logic_vector(to_unsigned(counter+int_res-1,16));
+                            o_we <= '1'; --permette la scritturaa in memoria
+                             state_curr <= WRITE;
+                              
+        when WRITE =>   
+                        o_data <= std_logic_vector(resize(unsigned(new_pixel_value), 8));
+                         state_curr <= CHECK_DIM_OUT;
+                                             
+        
+        when DONE =>    
+                        o_we <= '0'; --disabilito la scrittura
+                        o_en <= '0'; --disabilito comunicazione con memoria 
+                        o_done <= '1'; --alzo il segnale di done
+                        if i_start = '0' then  state_curr <= START; --attendo che start si abbassi per tornare allo stato inizale 
+                        else state_curr <= DONE; --altrimenti resto nello stato finale
+                        end if;
                                 
             end case;
         end if;
