@@ -31,7 +31,7 @@ architecture Behavior of project_reti_logiche is
 type state_type is (START, --stato iniziale
                     IN_READ, --stato per operazioni in preparazione alla lettura e indirizzarla a seconda che il primo ciclo di analisi 
                              --sulla memoria sia stata eseguita o meno
-                    GET_ROW_WAIT, --stato per la memorizzazione dell'elemento nell'indirizzo zero
+                    GET_DIM, --stato per la memorizzazione dell'elemento nell'indirizzo zero
                     CHECK_DIM_IN, --stato per check sul numero di elementi letti
                     CHECK_MIN_MAX,  --stato per l'aggiornamento progressivo di massimo e minimo
                     CHECK_DIM_OUT, --stato per check su secondo ciclo di lettura e conseguente scrittura in memoria 
@@ -91,11 +91,11 @@ begin
                             o_we <= '0';
                             reading_done <= false;
                             o_address <= "0000000000000000";
-                            if i_start = '1' then state_curr <= GET_ROW_WAIT;
+                            if i_start = '1' then state_curr <= GET_DIM;
                             else state_curr <= START;
                             end if;
             
-            when GET_ROW_WAIT => 
+            when GET_DIM => 
                                  int1 := to_integer(unsigned(i_data));
                                  o_address <= "0000000000000001";   
                                  state_curr <= CHECK_DIM_IN;
